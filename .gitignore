@@ -1,0 +1,31 @@
+# Rust build artifacts
+fastq_parser_rs/target/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Data files (too large for git)
+raw_data/
+*.fq
+*.fq.gz
+*.fastq
+*.fastq.gz
+
+# Temp files
+/tmp/
+*.tmp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code
+.claude/
