@@ -9,6 +9,11 @@ from pathlib import Path
 # Path to the Rust binary (relative to this file)
 RUST_BIN = Path(__file__).parent / "fastq_parser_rs/target/release/fastq_parser"
 
+_COLUMNS = {
+    "motif": ["read_id", "motif"],
+    "hairpin": ["read_id", "hp", "edits_count"],
+}
+
 
 def parse_motif(fq_path, output_path=None, pattern=None):
     """
@@ -85,6 +90,10 @@ def _run_parser(fq_path, mode, output_path=None, pattern=None):
     else:
         return_df = False
 
+    fq_path = Path(fq_path)
+    if not fq_path.exists():
+        raise FileNotFoundError(f"Input file not found: {fq_path}")
+
     # Build command
     cmd = [str(RUST_BIN), "-i", str(fq_path), "-m", mode, "-o", str(output_path)]
     if pattern:
@@ -98,12 +107,17 @@ def _run_parser(fq_path, mode, output_path=None, pattern=None):
     # Print timing info
     print(result.stderr.strip())
 
+    if Path(output_path).stat().st_size == 0:
+        if return_df:
+            Path(output_path).unlink()
+        return pd.DataFrame(columns=_COLUMNS[mode])
+
     if return_df:
-        df = pd.read_csv(output_path, sep='\t')
+        df = pd.read_csv(output_path, sep='\t', na_values=[""], keep_default_na=True)
         Path(output_path).unlink()  # Clean up temp file
         return df
     else:
-        return pd.read_csv(output_path, sep='\t')
+        return pd.read_csv(output_path, sep='\t', na_values=[""], keep_default_na=True)
 
 
 # Quick test

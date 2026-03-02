@@ -1,113 +1,112 @@
 # RBPScan FASTQ Parser
 
-Fast FASTQ parser for RBPscan motif and hairpin extraction. Built with Rust for speed, with a simple Python interface.
+Fast parser for RBPscan FASTQ data. Extracts motifs (R1) and hairpin edit counts (R2), merges by read, and summarizes editing rates per motif. Optionally maps results to a known variant library.
 
-## Performance
+---
 
-| Dataset | Python | Rust | Speedup |
-|---------|--------|------|---------|
-| 9.2M reads (gzipped) | 11-13s | 7-8s | **1.5x** |
+## Quick start
 
-## Installation
-
-### 1. Clone the repo
+### 1. Get the code
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/RBPScan_fastq_parse.git
+git clone https://github.com/OwenSanborn/RBPScan_fastq_parse.git
 cd RBPScan_fastq_parse
 ```
 
-### 2. Build the Rust binary
-
-Requires [Rust](https://rustup.rs/) to be installed.
+### 2. Run setup (one time only)
 
 ```bash
-cd fastq_parser_rs
-cargo build --release
-cd ..
+bash setup.sh
 ```
 
-### 3. (Optional) Install Python dependencies
+This installs Rust (if needed), builds the fast parser, and installs Python dependencies. Takes about 1 minute the first time.
+
+### 3. Run on your data
 
 ```bash
-pip install pandas
+python process_all_samples.py /path/to/raw_data/ /path/to/output/
 ```
 
-## Usage
+Your `raw_data/` folder can contain either:
+- **Subdirectories**, one per sample (e.g. `raw_data/Sample1/`, `raw_data/Sample2/`) — each containing paired FASTQ files
+- **A flat folder** with a single pair of FASTQ files
 
-### Python (Recommended)
+Supported file naming conventions: `_R1_001.fastq.gz`, `_R1.fq.gz`, `_1.fq.gz`, and others (auto-detected).
 
-```python
-from fastq_parser import parse_motif, parse_hairpin, parse_paired
+---
 
-# Parse R1 motifs - returns pandas DataFrame
-motif_df = parse_motif("sample_R1.fq.gz")
+## Output
 
-# Parse R2 hairpins
-hairpin_df = parse_hairpin("sample_R2.fq.gz")
+Results are saved to your output folder:
 
-# Parse both and merge by read_id
-merged_df = parse_paired("sample_R1.fq.gz", "sample_R2.fq.gz")
+| File | Contents |
+|------|----------|
+| `<sample>_edits.csv` | Per-sample motif summary |
+| `final_consolidated_edits.csv` | All samples combined |
+| `final_library_key_counts.csv` | Per-variant counts (only if `--library-key` is used) |
 
-# Custom regex pattern
-df = parse_motif("file.fq.gz", pattern=r"CUSTOM(.{11})PATTERN")
-```
-
-### Command Line
-
-```bash
-# Motif extraction (R1)
-./fastq_parser_rs/target/release/fastq_parser \
-    -i input_R1.fq.gz \
-    -m motif \
-    -o motifs.tsv
-
-# Hairpin extraction (R2)
-./fastq_parser_rs/target/release/fastq_parser \
-    -i input_R2.fq.gz \
-    -m hairpin \
-    -o hairpins.tsv
-```
-
-#### Options
-
-| Flag | Description |
-|------|-------------|
-| `-i, --input` | Input FASTQ file (gzipped or plain) |
-| `-m, --mode` | `motif` (R1) or `hairpin` (R2) |
-| `-o, --output` | Output TSV file (stdout if omitted) |
-| `-p, --pattern` | Custom regex pattern (optional) |
-| `-t, --threads` | Number of threads (0 = auto) |
-
-## Output Format
-
-### Motif (R1)
+Each row in the summary:
 
 | Column | Description |
 |--------|-------------|
-| `read_id` | FASTQ read identifier |
-| `motif` | 11bp motif sequence (empty if no match) |
+| `sample` | Sample name |
+| `motif` | 11bp motif sequence |
+| `occurrence` | Number of reads containing this motif |
+| `total_edits` | Total edited bases across all reads |
+| `reads_edited` | Reads with at least one edit |
+| `all_reads` | Total paired reads for this sample |
+| `score` | Mean edits per read (`total_edits / occurrence`) |
+| `efficiency_1` | Editing efficiency (`total_edits / (6 × occurrence + 1)`) |
 
-### Hairpin (R2)
+---
 
-| Column | Description |
-|--------|-------------|
-| `read_id` | FASTQ read identifier |
-| `hp` | 30bp hairpin region |
-| `edits_count` | Number of AATCC (edited) sites (0-6) |
+## Library key (variant mapping)
 
-## Default Patterns
+If you have a defined set of known variants, you can map observed motifs to them. Create a CSV with `name` and `sequence` columns:
 
-- **Motif (R1)**: `TTCTGGCTGACATA(.{11})ATACAATCAGATATGCA`
-- **Hairpin (R2)**: `(AA[TC]C[TC]){6}AATTT` - captures 6 repeats before AATTT anchor
+```
+name,sequence
+Sox2_motif,AATCAATGG
+Oct4_motif,TTTGCATA
+Klf4_motif,CCGCCCGC
+```
+
+Then run:
+
+```bash
+python process_all_samples.py raw_data/ output/ --library-key variants.csv
+```
+
+This produces `final_library_key_counts.csv` with one row per `(sample, variant)`. Variants with no observed reads appear as 0-count rows.
+
+---
+
+## All options
+
+```
+python process_all_samples.py <input_dir> <output_dir> [options]
+
+Options:
+  --min-occurrence N    Minimum reads per motif to report (default: 10)
+  --library-key PATH    Path to variant library CSV
+```
+
+---
+
+## Requirements
+
+- Python 3.8+
+- pandas, numpy (installed by `setup.sh`)
+- Rust (installed automatically by `setup.sh`)
+
+---
 
 ## Files
 
 ```
-fastq_parser.py          # Python wrapper (import this)
-fastq_parser_rs/         # Rust source code
-  ├── Cargo.toml         # Rust dependencies
-  └── src/main.rs        # Parser implementation
-baseline_parser.py       # Pure Python baseline (slower)
-benchmark.py             # Performance comparison script
+setup.sh                 # One-time setup script
+process_all_samples.py   # Main script — run this
+fastq_parser.py          # Python wrapper for the Rust parser
+fastq_parser_rs/         # Rust source (built by setup.sh)
+requirements.txt         # Python dependencies
 ```
