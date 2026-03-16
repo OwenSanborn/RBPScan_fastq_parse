@@ -165,7 +165,7 @@ def apply_library_key(
     return pd.DataFrame(rows)
 
 
-def process_all(input_dir, output_dir, min_occurrence=10, library_key=None):
+def process_all(input_dir, output_dir, min_occurrence=10, library_key=None, sequence_col="seq"):
     """
     Process all sample directories.
 
@@ -175,6 +175,7 @@ def process_all(input_dir, output_dir, min_occurrence=10, library_key=None):
         output_dir: Where to save results
         min_occurrence: Minimum read count per motif to include in output
         library_key: Optional path to library key CSV for variant mapping
+        sequence_col: Column in library key CSV containing the sequence to match (default: "seq")
 
     Returns:
         DataFrame with all summarized results
@@ -249,7 +250,7 @@ def process_all(input_dir, output_dir, min_occurrence=10, library_key=None):
         # 5. Apply library key if provided
         if library_key:
             print(f"\nApplying library key: {library_key}")
-            key_df = apply_library_key(final_df, library_key)
+            key_df = apply_library_key(final_df, library_key, sequence_col=sequence_col)
             key_path = output_path / "final_library_key_counts.csv"
             key_df.to_csv(key_path, index=False)
             print(f"Saved: {key_path}")
@@ -279,7 +280,9 @@ if __name__ == "__main__":
     parser.add_argument("--min-occurrence", type=int, default=10,
                         help="Minimum reads per motif to include in output")
     parser.add_argument("--library-key", metavar="PATH",
-                        help="Path to library key CSV for variant mapping (columns: name, sequence)")
+                        help="Path to library key CSV for variant mapping")
+    parser.add_argument("--sequence-col", default="seq",
+                        help="Column name in library key CSV containing the sequence (default: seq)")
     args = parser.parse_args()
 
     process_all(
@@ -287,4 +290,5 @@ if __name__ == "__main__":
         args.output_dir,
         min_occurrence=args.min_occurrence,
         library_key=args.library_key,
+        sequence_col=args.sequence_col,
     )
