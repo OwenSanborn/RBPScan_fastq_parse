@@ -140,7 +140,7 @@ fn main() {
             .unwrap();
     }
 
-    let default_motif = r"CCAACGCTATTCTGG(.+)CCAACGCAATTCTGG";
+    let default_motif = r"(CCAACGCTATTCTGG.+CCAACGCAATTCTGG)";
     // Hairpin pattern: capture group excludes AATTT anchor (no lookahead needed)
     let default_hairpin =
         r"(AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC])AATTT";
