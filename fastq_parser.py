@@ -17,12 +17,15 @@ _COLUMNS = {
 
 def parse_motif(fq_path, output_path=None, pattern=None):
     """
-    Parse R1 reads to extract 11nt motifs.
+    Parse R1 reads to extract the variable motif between the two cloning arms.
+
+    The default pattern captures everything between TTCTGGCTGACATA and
+    ATACAATCAGATATGCA — no size limit on the motif.
 
     Args:
         fq_path: Path to R1 FASTQ file (gzipped or plain)
         output_path: Optional output TSV path (returns DataFrame if None)
-        pattern: Optional custom regex pattern
+        pattern: Optional custom regex pattern (must have 1 capture group)
 
     Returns:
         DataFrame with columns: read_id, motif

@@ -74,8 +74,8 @@ fn read_fastq_records(path: &str) -> Vec<(String, String)> {
 }
 
 // Pre-filter anchors for fast rejection (SIMD-accelerated with memchr)
-const MOTIF_LEFT: &[u8] = b"TTCTGGCTGACATA";
-const MOTIF_RIGHT: &[u8] = b"ATACAATCAGATATGCA";
+const MOTIF_LEFT: &[u8] = b"CCAACGCTATTCTGG";
+const MOTIF_RIGHT: &[u8] = b"CCAACGCAATTCTGG";
 const HAIRPIN_ANCHOR: &[u8] = b"AATTT";
 const EDIT_MARKER: &[u8] = b"AATCC";
 
@@ -140,7 +140,7 @@ fn main() {
             .unwrap();
     }
 
-    let default_motif = r"TTCTGGCTGACATA(.+)ATACAATCAGATATGCA";
+    let default_motif = r"CCAACGCTATTCTGG(.+)CCAACGCAATTCTGG";
     // Hairpin pattern: capture group excludes AATTT anchor (no lookahead needed)
     let default_hairpin =
         r"(AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC]AA[TC]C[TC])AATTT";

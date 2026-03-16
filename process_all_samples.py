@@ -12,36 +12,63 @@ from pathlib import Path
 from fastq_parser import parse_paired
 
 
-PAIR_PATTERNS = [
-    ("*_R1_001.fastq.gz", "*_R2_001.fastq.gz"),
-    ("*_R1.fastq.gz",     "*_R2.fastq.gz"),
-    ("*_R1_001.fq.gz",    "*_R2_001.fq.gz"),
-    ("*_R1.fq.gz",        "*_R2.fq.gz"),
-    ("*_1.fastq.gz",      "*_2.fastq.gz"),
-    ("*_1.fq.gz",         "*_2.fq.gz"),
-    ("*_R1.fq",           "*_R2.fq"),
-    ("*_1.fq",            "*_2.fq"),
+# Ordered from most-specific to least-specific so the right substitution is found first
+_PAIR_SUBSTITUTIONS = [
+    ("_R1_001.", "_R2_001."),
+    ("_R1.", "_R2."),
+    ("_1.", "_2."),
+]
+
+# Glob patterns used to discover R1 files
+_R1_GLOBS = [
+    "*_R1_001.fastq.gz",
+    "*_R1.fastq.gz",
+    "*_R1_001.fq.gz",
+    "*_R1.fq.gz",
+    "*_1.fastq.gz",
+    "*_1.fq.gz",
+    "*_R1.fq",
+    "*_1.fq",
 ]
 
 
-def find_paired_files(folder):
+def _derive_r2_path(r1_path: Path):
+    """Return the expected R2 path by substituting the R1 token in the filename."""
+    name = r1_path.name
+    for old, new in _PAIR_SUBSTITUTIONS:
+        if old in name:
+            return r1_path.parent / name.replace(old, new, 1)
+    return None
+
+
+def _sample_name(r1_path: Path) -> str:
+    """Extract sample name from R1 filename by stripping the R1/lane suffix."""
+    name = r1_path.name
+    for old, _ in _PAIR_SUBSTITUTIONS:
+        if old in name:
+            return name[: name.index(old)]
+    return r1_path.stem
+
+
+def find_all_pairs(folder) -> list:
     """
-    Find R1/R2 paired files in a folder using multiple naming conventions.
+    Find ALL R1/R2 paired files in a folder.
 
     Returns:
-        (Path, Path) if found, or (None, None) if no paired files found.
+        List of (sample_name, r1_path, r2_path) tuples — one per pair.
     """
     folder = Path(folder)
-    for pat_r1, pat_r2 in PAIR_PATTERNS:
-        r1_files = list(folder.glob(pat_r1))
-        r2_files = list(folder.glob(pat_r2))
-        if r1_files and r2_files:
-            if len(r1_files) > 1:
-                print(f"  Warning: multiple R1 files match '{pat_r1}' in {folder.name}, using first")
-            if len(r2_files) > 1:
-                print(f"  Warning: multiple R2 files match '{pat_r2}' in {folder.name}, using first")
-            return r1_files[0], r2_files[0]
-    return None, None
+    pairs = []
+    seen = set()
+    for glob_pat in _R1_GLOBS:
+        for r1 in sorted(folder.glob(glob_pat)):
+            if r1 in seen:
+                continue
+            r2 = _derive_r2_path(r1)
+            if r2 and r2.exists():
+                pairs.append((_sample_name(r1), r1, r2))
+                seen.add(r1)
+    return pairs
 
 
 def editing_counts(reads, min_occurrence=10, sites=6):
@@ -163,15 +190,11 @@ def process_all(input_dir, output_dir, min_occurrence=10, library_key=None):
     candidates = []
     lib_folders = sorted([f for f in input_path.iterdir() if f.is_dir()])
     for lib_folder in lib_folders:
-        r1, r2 = find_paired_files(lib_folder)
-        if r1 and r2:
-            candidates.append((lib_folder.name, r1, r2))
+        candidates.extend(find_all_pairs(lib_folder))
 
     # Flat directory fallback: no subdir had paired files
     if not candidates:
-        r1, r2 = find_paired_files(input_path)
-        if r1 and r2:
-            candidates.append((input_path.name, r1, r2))
+        candidates.extend(find_all_pairs(input_path))
 
     n = len(candidates)
     print(f"Total libraries found: {n}")
